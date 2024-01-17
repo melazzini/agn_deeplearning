@@ -298,3 +298,32 @@ def distance_to_function(point_x, point_y, f_x_left, f_x_right, f, steps, *args)
             min_y = y
 
     return min_d, min_x, min_y
+
+
+def half_energy_bins_number(x, y):
+    """
+    This algorithm reduces the number of energy bins by half.
+    The resulting x will be built from the average values of
+    the original x, and the resulting y will be the sum of
+    the original y.
+    """
+    x_result = np.zeros(int(len(x)/2))
+    y_result = np.zeros(int(len(y)/2))
+    
+    for i in range(len(x_result)):
+        x_result[i] = (x[2*i] + x[2*i+1])/2
+        y_result[i] = y[2*i] + y[2*i+1]
+    return x_result,y_result
+
+def reduce_energy_bins_number(x,y,times_:int=1):
+    """
+    Reduces the energy bins a number of times.
+    """
+    x_new,y_new = x,y
+    for i in range(times_):
+        x_new,y_new = half_energy_bins_number(x_new,y_new)
+    return x_new,y_new
+
+
+def normalize_spectrum(x,y):
+    return x,(y-np.mean(y))/np.std(y)
