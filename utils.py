@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass
-from typing import Tuple, List, Iterable
+from typing import Tuple, List, Iterable, Final
 from abc import abstractmethod, ABC
 
 Vector1d = List[float]
@@ -352,3 +352,192 @@ def prepare_spectrum(x_raw,y_raw,energy_left:float,energy_right:float,squeezin_f
     x_smooth,y_smooth = reduce_energy_bins_number(x_raw,y_raw,times_=squeezin_factor)
     x_clipped, y_clipped = clip_spectrum(x_smooth,y_smooth,energy_left=energy_left,energy_right=energy_right)
     return normalize_spectrum(x_clipped,y_clipped)
+
+
+AGN_VIEWING_DIRECTIONS_DEG: Final[Dict[str, AngularInterval]] = {
+    "6075": AngularInterval(60, 15),
+    "7590": AngularInterval(75, 15),
+    "6070": AngularInterval(60, 10),
+    "7080": AngularInterval(70, 10),
+    "8090": AngularInterval(80, 10),
+}
+
+
+AGN_IRON_ABUNDANCE: Final[Dict[str, float]] = {
+    "05xfe": 0.5,
+    "0525xfe": 0.525,
+    "07xfe": 0.7,
+    "1xfe": 1,
+    "105xfe": 1.05,
+    "15xfe": 1.5,
+    "2xfe": 2,
+    "21xfe": 2.1,
+    "4xfe": 4,
+}
+
+AGN_NH_AVERAGE: Final[Dict[str:float]] = {
+    "22": 1e22,
+    "222": 2e22,
+    "522": 5e22,
+    "822": 8e22,
+    "23": 1e23,
+    "223": 2e23,
+    "323": 3e23,
+    "523": 5e23,
+    "24": 1e24,
+    "224": 2e24,
+    "324": 3e24,
+    "424": 4e24,
+    "524": 5e24,
+    "824": 8e24,
+    "25": 1e25,
+    "225": 2e25,
+}
+
+class ColumnDensityInterval(Interval2D):
+    pass
+
+class ColumnDensityGrid:
+    """
+    This class defines the grid of column densities
+    used to group spectrum data from agn simulations.
+
+    Basically, you use it to get the index of the given
+    column density on the whole grid for the current project.
+
+    This can be useful to group spectrum data and build labels
+    for spectrum files, according to the given values of
+    the column density.
+
+    You are not require to use any specific units, but
+    probably you want to work in [N_H]=cm^{-2}.
+
+    ===========================
+
+    example01:
+
+    nh_grid = ColumnDensityGrid(left_nh=1e22, right_nh=2e24, n_intervals=30)
+
+    print(nh_grid.index(nh=1e23))
+
+    ==========================
+    """
+
+    def __init__(self, left_nh: float, right_nh: float, n_intervals: int):
+        """Initializes the Grid
+
+        Args:
+            left_nh (float): the left-most bound of the grid
+            right_nh (float): the right-most bound of the grid
+            n_intervals (int): the number of intervals of the grid
+        """
+
+        self.left = left_nh
+        self.right = right_nh
+        self.n_intervals = n_intervals
+
+        self.bounds = []
+        """the bounds of the grid
+        """
+
+        self.nh_list = []
+        """the mid-values of the bounds
+        """
+
+        nh_bounds_raw = np.logspace(
+            np.log10(self.left), np.log10(self.right), n_intervals+1)
+
+        self.__setup_grid(nh_bounds_raw)
+        self.d_nh = (np.log10(self.right) -
+                     np.log10(self.left))/self.n_intervals
+
+    def __setup_grid(self, nh_bounds_raw):
+        for i, nh_left_val in enumerate(nh_bounds_raw[:-1]):
+
+            self.nh_list += [10**((np.log10(nh_left_val) +
+                                  np.log10(nh_bounds_raw[i+1]))/2)]
+
+            self.bounds += [ColumnDensityInterval(
+                left=nh_left_val, right=nh_bounds_raw[i+1])]
+
+    def index(self, nh: float):
+        """Get the grid index of the given column density.
+
+        Args:
+            nh (float): the column density
+        """
+        if(nh <= 0):
+            return 0
+
+        return int((np.log10(nh)-np.log10(self.left))/self.d_nh)
+
+    def __str__(self):
+        return f'{self.left:0.2g}:{self.right:0.2g}:{self.n_intervals}'
+
+LEFT_NH = 10**(20.95)
+RIGHT_NH = 10**(26.05)
+NH_INTERVALS = 51
+
+ENERGY_LEFT = 1e3
+ENERGY_RIGHT = 50e3
+SQUEEZING_FACTOR = 2
+
+DEFAULT_NH_GRID: Final[ColumnDensityGrid] = ColumnDensityGrid(
+    left_nh=LEFT_NH, right_nh=RIGHT_NH, n_intervals=NH_INTERVALS)
+
+
+@dataclass
+class NormalizedSpectrumInfo:
+    nha: float # average column density, in $cm^{-2}$
+    n: int # average number of clouds
+    afe: float # iron abundance
+    alpha: AngularInterval # viewnig angle interval, in rad
+    nh: float # column density on the line of sight, in $cm^{-2}$
+    component:str # spectrum component
+    fluorescent_line: str # fluorescent line
+
+    y:np.ndarray # prepared photon counts channels
+
+    def nha_id(self):
+        return DEFAULT_NH_GRID.index(self.nha)
+
+    def nh_id(self):
+        return DEFAULT_NH_GRID.index(self.nh)
+
+    def alpha_id(self):
+        if self.alpha==AngularInterval(60,10):
+            return 0
+        elif self.alpha==AngularInterval(70,10):
+            return 1
+        elif self.alpha==AngularInterval(80,10):
+            return 2
+        else:
+            raise RuntimeError("the alpha value is not valid!")
+    
+    @staticmethod
+    def build_normalized_spectrum_info(spectrum_file_path:str, energy_left:float=ENERGY_LEFT, energy_right:float=ENERGY_RIGHT, squeezing_factor:int=SQUEEZING_FACTOR):
+        spectrum_filename = spectrum_file_path.split('/')[-1].split('.spectrum')[0]
+
+        nhaver_label_str, n_str, afe_str, alpha_str, nh_num_intervals_str, nh_left_str, nh_right_str, nh_id_str, component, line = spectrum_filename.split('_')
+
+        nha = AGN_NH_AVERAGE[nhaver_label_str]
+        n = int(n_str)
+        afe = AGN_IRON_ABUNDANCE[afe_str]
+        alpha = AGN_VIEWING_DIRECTIONS_DEG[alpha_str]
+
+        NormalizedSpectrumInfo.validate_nh_intervals(num=int(nh_num_intervals_str),left=float(nh_left_str),right=float(nh_right_str))
+        nh = DEFAULT_NH_GRID.nh_list[int(nh_id_str)]
+
+        x_raw, y_raw, _ = x_y_z(path=spectrum_file_path)
+        _, y_prepared = prepare_spectrum(x_raw=x_raw,y_raw=y_raw,energy_left=energy_left, energy_right=energy_right, squeezin_factor=squeezing_factor)
+
+        return NormalizedSpectrumInfo(nha=nha, n=n,afe=afe, alpha=alpha, nh=nh, component=component, fluorescent_line=line, y=y_prepared)
+
+    @staticmethod
+    def validate_nh_intervals(num:int, left:float, right:float):
+        if num != NH_INTERVALS:
+            raise RuntimeError("the number of column density intervals is not valid!")
+        if abs(1/left-1/LEFT_NH)>DEFAULT_EPSILON:
+            raise RuntimeError("the left column density interval is not valid!")
+        if abs(1/right-1/RIGHT_NH)>DEFAULT_EPSILON:
+            raise RuntimeError("the right column density interval is not valid!")
