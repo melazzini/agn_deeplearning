@@ -327,3 +327,28 @@ def reduce_energy_bins_number(x,y,times_:int=1):
 
 def normalize_spectrum(x,y):
     return x,(y-np.mean(y))/np.std(y)
+
+def clip_spectrum(x,y,energy_left,energy_right):
+    """
+    Returns a new spectrum without the energy intervals
+    that do not belong to [energy_left,energy_right]
+    """
+    x_new = []
+    y_new = []
+
+    for x_i, y_i in zip(x,y):
+        if energy_left <= x_i <= energy_right:
+            x_new+=[x_i]
+            y_new+=[y_i]
+
+    return np.array(x_new), np.array(y_new)
+
+def prepare_spectrum(x_raw,y_raw,energy_left:float,energy_right:float,squeezin_factor:int):
+    """
+    It receives a given raw spectrum, then reduce the number of energy bins by squeezing it
+    the given squeezing_factor number of times, then this function clips the resulting spectrum,
+    and then normalized it before returning it as a tupple (x_new,y_new)
+    """
+    x_smooth,y_smooth = reduce_energy_bins_number(x_raw,y_raw,times_=squeezin_factor)
+    x_clipped, y_clipped = clip_spectrum(x_smooth,y_smooth,energy_left=energy_left,energy_right=energy_right)
+    return normalize_spectrum(x_clipped,y_clipped)
