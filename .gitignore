@@ -1,3 +1,6 @@
 .ipynb_checkpoints
 __pycache__
 .dummydata
+paths_in_this_machine.py
+test_spectra_paths.txt
+train_spectra_paths.txt

@@ -349,6 +349,9 @@ def prepare_spectrum(x_raw,y_raw,energy_left:float,energy_right:float,squeezin_f
     the given squeezing_factor number of times, then this function clips the resulting spectrum,
     and then normalized it before returning it as a tupple (x_new,y_new)
     """
+    if np.sum(y_raw) < 1500:
+        raise ValueError("Two few photons in the spectrum")
+    
     x_smooth,y_smooth = reduce_energy_bins_number(x_raw,y_raw,times_=squeezin_factor)
     x_clipped, y_clipped = clip_spectrum(x_smooth,y_smooth,energy_left=energy_left,energy_right=energy_right)
     return normalize_spectrum(x_clipped,y_clipped)
@@ -557,3 +560,17 @@ def print_train_time(start, end, device=None):
     total_time = end - start
     print(f"\nTrain time on {device}: {total_time:.3f} seconds")
     return total_time
+
+
+def get_train_and_test_paths(train_paths_file_path, test_paths_file_path):
+    all_train_paths = []
+    all_test_paths = []
+    with open(train_paths_file_path) as train_paths_file:
+        for line in train_paths_file:
+            all_train_paths += [line]
+            
+    with open(test_paths_file_path) as test_paths_file:
+        for line in test_paths_file:
+            all_test_paths += [line]
+        
+    return all_train_paths, all_test_paths
