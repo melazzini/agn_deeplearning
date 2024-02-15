@@ -33,17 +33,17 @@ def generate_train_and_test_paths_files(root_directories,train_data_fraction:flo
 
     for root_dir in root_directories:
         for spectrum_path in listdir(root_dir):
-            if "CONTINUUM_NONE.spectrum" in spectrum_path and "6075" not in spectrum_path and "7590" not in spectrum_path:
+            if "FULL_ALL.spectrum" in spectrum_path and "6075" not in spectrum_path and "7590" not in spectrum_path:
                 all_spectra += [os.path.join(root_dir,spectrum_path)]
 
     random.shuffle(all_spectra)
 
     train_spectra_paths, test_spectra_paths = all_spectra[:int(train_data_fraction*len(all_spectra))], all_spectra[int(train_data_fraction*len(all_spectra)):]
 
-    print(len(all_spectra))
-    print(len(train_spectra_paths))
-    print(len(test_spectra_paths))
-    print(len(train_spectra_paths)+len(test_spectra_paths))
+    # print(len(all_spectra))
+    # print(len(train_spectra_paths))
+    # print(len(test_spectra_paths))
+    # print(len(train_spectra_paths)+len(test_spectra_paths))
 
     with open("train_spectra_paths.txt","w") as train_paths_file:
         for path_ in train_spectra_paths:

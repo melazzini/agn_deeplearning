@@ -349,7 +349,7 @@ def prepare_spectrum(x_raw,y_raw,energy_left:float,energy_right:float,squeezin_f
     the given squeezing_factor number of times, then this function clips the resulting spectrum,
     and then normalized it before returning it as a tupple (x_new,y_new)
     """
-    if np.sum(y_raw) < 1500:
+    if np.sum(y_raw) < 6000:
         raise ValueError("Two few photons in the spectrum")
     
     x_smooth,y_smooth = reduce_energy_bins_number(x_raw,y_raw,times_=squeezin_factor)
@@ -370,8 +370,10 @@ AGN_IRON_ABUNDANCE: Final[Dict[str, float]] = {
     "05xfe": 0.5,
     "0525xfe": 0.525,
     "07xfe": 0.7,
+    "075xfe": 0.75,
     "1xfe": 1,
     "105xfe": 1.05,
+    "125xfe": 1.25,
     "15xfe": 1.5,
     "2xfe": 2,
     "21xfe": 2.1,
@@ -392,6 +394,8 @@ AGN_NH_AVERAGE: Final[Dict[str:float]] = {
     "324": 3e24,
     "424": 4e24,
     "524": 5e24,
+    "624": 6e24,
+    "724": 7e24,
     "824": 8e24,
     "25": 1e25,
     "225": 2e25,
@@ -501,6 +505,8 @@ class NormalizedSpectrumInfo:
 
     y:np.ndarray # prepared photon counts channels
 
+    file_name:str
+
     def nha_id(self):
         return DEFAULT_NH_GRID.index(self.nha)
 
@@ -522,19 +528,25 @@ class NormalizedSpectrumInfo:
         spectrum_filename = spectrum_file_path.split('/')[-1].split('.spectrum')[0]
 
         nhaver_label_str, n_str, afe_str, alpha_str, nh_num_intervals_str, nh_left_str, nh_right_str, nh_id_str, component, line = spectrum_filename.split('_')
-
+        file_name = spectrum_filename
         nha = AGN_NH_AVERAGE[nhaver_label_str]
         n = int(n_str)
         afe = AGN_IRON_ABUNDANCE[afe_str]
         alpha = AGN_VIEWING_DIRECTIONS_DEG[alpha_str]
 
+        if n in [0,1,2]:
+            raise ValueError("Bad n clouds!")
+
         NormalizedSpectrumInfo.validate_nh_intervals(num=int(nh_num_intervals_str),left=float(nh_left_str),right=float(nh_right_str))
         nh = DEFAULT_NH_GRID.nh_list[int(nh_id_str)]
+        
+        if nh<= 0.5e24:
+            raise ValueError("Bad nh!")
 
         x_raw, y_raw, _ = x_y_z(path=spectrum_file_path)
         _, y_prepared = prepare_spectrum(x_raw=x_raw,y_raw=y_raw,energy_left=energy_left, energy_right=energy_right, squeezin_factor=squeezing_factor)
 
-        return NormalizedSpectrumInfo(nha=nha, n=n,afe=afe, alpha=alpha, nh=nh, component=component, fluorescent_line=line, y=y_prepared)
+        return NormalizedSpectrumInfo(nha=nha, n=n,afe=afe, alpha=alpha, nh=nh, component=component, fluorescent_line=line, y=y_prepared,file_name=file_name)
 
     @staticmethod
     def validate_nh_intervals(num:int, left:float, right:float):
